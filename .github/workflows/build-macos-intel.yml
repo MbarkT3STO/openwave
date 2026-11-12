@@ -1,0 +1,137 @@
+Skip to main content
+FileHelper.com
+Upload File
+Open Menu
+FileHelper.com
+Drop or upload your file.
+Open from Google Drive
+1Identify
+Identify over 15,000 file formats
+
+Unknown file? No problem. FileHelper.com can identify over 15,000 file formats. It also displays a list of file properties and metadata for each file.
+
+2View
+View hundreds of different file types
+
+View over 150 file types in your web browser. Open Microsoft Office documents, images, and more. No download required — just drag and drop your file.
+
+3Convert
+Convert your files to different file formats
+
+FileHelper.com converts digital images — including camera raw files — to several common formats, including JPEG, PNG, TIFF, GIF, and BMP.
+
+FileHelper.com is a free online file viewer that is safe, fast, and easy-to-use. No software to download — simply drag and drop your file onto this window or select "Upload" to select your file. If FileHelper.com supports the format, it will display the file directly in your web browser.
+
+Site Menu
+File Viewer
+Supported File Formats
+About FileHelper.com
+Other Resources
+FileInfo.com
+File Viewer Plus (Windows)
+File Viewer for Android
+Google Drive Add-on
+Install Google Drive Add-on
+© 2026 Sharpened Productions  |  Terms of Use  |  Privacy Policy  |  Contact  | 
+Dark Theme
+
+ 
+Toggle Sidebar
+FileHelper.com
+View As...
+Close
+
+build-macos-intel.yml
+Drag and drop or upload a file.
+YAML Document Icon
+build-macos-intel.yml
+File Properties
+Name:
+build-macos-intel.yml
+Modified:
+Nov 12, 2026, 9:25 PM
+Show all properties
+File Type
+YAML Document
+A YML file is a text document that contains data formatted using YAML (YAML Ain't Markup Language), a human-readable data format used for data serialization. It is used for reading and writing data independent of a specific programming language. Because YAML syntax is language-agnostic, YML files can be incorporated into programs written in most popular programming languages, including C/C++, Ruby, Python, Java, Perl, C#, PHP, and others.
+
+View more at FileInfo.com
+© Sharpened
+   |   
+Privacy Policy
+     
+name: Build macOS Intel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15-intel   # Intel (x86_64) runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (version from rust-toolchain.toml)
+        run: |
+          rustup show
+          rustup target add x86_64-apple-darwin
+          rustc -vV
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-intel-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Create OpenWave.app
+        run: |
+          APP=OpenWave.app
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp target/x86_64-apple-darwin/release/openwave "$APP/Contents/MacOS/openwave"
+
+          # Icon: PNG -> .icns
+          ICONSET=openwave.iconset
+          mkdir "$ICONSET"
+          SRC=assets/branding/openwave-icon-512.png
+          for s in 16 32 64 128 256 512; do
+            sips -z $s $s "$SRC" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+          done
+          cp "$ICONSET/icon_32x32.png"   "$ICONSET/icon_16x16@2x.png"
+          cp "$ICONSET/icon_64x64.png"   "$ICONSET/icon_32x32@2x.png"
+          cp "$ICONSET/icon_256x256.png" "$ICONSET/icon_128x128@2x.png"
+          cp "$ICONSET/icon_512x512.png" "$ICONSET/icon_256x256@2x.png"
+          rm "$ICONSET/icon_64x64.png"
+          iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/openwave.icns"
+
+          cat > "$APP/Contents/Info.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>OpenWave</string>
+            <key>CFBundleDisplayName</key><string>OpenWave</string>
+            <key>CFBundleIdentifier</key><string>com.openwave.player</string>
+            <key>CFBundleExecutable</key><string>openwave</string>
+            <key>CFBundleIconFile</key><string>openwave</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>1.0</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          EOF
+
+          # Ad-hoc sign (not notarized)
+          codesign --force --deep -s - "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" OpenWave-macos-x86_64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenWave-macos-x86_64
+          path: OpenWave-macos-x86_64.zip
